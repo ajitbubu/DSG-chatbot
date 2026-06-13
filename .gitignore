@@ -1,0 +1,14 @@
+# Local, environment-specific config (holds your real Firebase URL) — never commit
+config.local.js
+.env
+.env.*
+!.env.example
+
+# Dependencies / build
+node_modules/
+
+# OS / editor
+.DS_Store
+
+# Tooling
+.gstack/
