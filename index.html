@@ -78,30 +78,17 @@
   </main>
 
   <!--
-    1) Configure the widget BEFORE the script tag.
-       In production, change `webhookUrl` to your real lead-capture endpoint.
+    1) Environment-specific config lives in config.local.js (gitignored), so the
+       Firebase URL is never committed. Copy config.example.js → config.local.js
+       and fill in your values. This script MUST load before the widget below.
   -->
-  <script>
-    window.IDPrivacyChatbotConfig = {
-      webhookUrl: "https://example.com/api/contact-lead",
-      companyName: "Data Safeguard",
-      productName: "ID-PRIVACY®",
-      defaultAssignee: "Privacy Automation Team",
-      people: [
-        "Sales / Product Specialist",
-        "Privacy Consultant",
-        "Technical Architect",
-        "Ajit Sahu",
-        "Sudhir Sahu"
-      ]
-      // Future calendar integrations (placeholders — wire up when ready):
-      // calendly:        { url: "https://calendly.com/your-team/intro" },
-      // googleCalendar:  { enabled: false },
-      // outlookCalendar: { enabled: false }
-    };
-  </script>
+  <script src="./config.local.js"></script>
 
-  <!-- 2) Load the widget. In production, host this on your CDN. -->
+  <!-- 2) Optional: disposable email-domain blocklist. Loads before the widget;
+       if omitted, the widget still blocks common free providers. -->
+  <script src="./disposable-domains.js" defer></script>
+
+  <!-- 3) Load the widget. In production, host this on your CDN. -->
   <script src="./idprivacy-chatbot.js" defer></script>
 </body>
 </html>

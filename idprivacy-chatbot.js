@@ -49,6 +49,13 @@
     ],
     storageKey: 'idp_chatbot_session_v1',
     typingDelayMs: 600,
+    // Lead email policy: require a work email (reject Gmail/Yahoo/etc.).
+    allowFreeEmail: false,        // set true to accept personal/free email providers
+    extraFreeEmailDomains: null,  // e.g. ['contractor.io'] to block additional domains
+    // Theme: override any subset of the dark-brand CSS variables, e.g.
+    //   theme: { accent: '#16a34a', bg: '#0b1f14', surface: '#10271b' }
+    // Keys: accent, accentHover, onAccent, bg, surface, surface2, text, muted, border
+    theme: null,
     // Calendar integration placeholders — wired up here so future work
     // only needs to flip a flag / supply a URL.
     calendly: null,        // { url: "https://calendly.com/..." }
@@ -153,6 +160,56 @@
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s).trim());
   }
 
+  // Free / personal / disposable providers. Leads must use a work email so the
+  // sales team can qualify them. Extend via config.extraFreeEmailDomains.
+  var FREE_EMAIL_DOMAINS = {
+    'gmail.com':1,'googlemail.com':1,'yahoo.com':1,'yahoo.co.uk':1,'yahoo.co.in':1,
+    'ymail.com':1,'rocketmail.com':1,'hotmail.com':1,'hotmail.co.uk':1,'hotmail.fr':1,
+    'outlook.com':1,'live.com':1,'msn.com':1,'aol.com':1,'icloud.com':1,'me.com':1,
+    'mac.com':1,'protonmail.com':1,'proton.me':1,'pm.me':1,'gmx.com':1,'gmx.de':1,
+    'gmx.net':1,'mail.com':1,'zoho.com':1,'yandex.com':1,'yandex.ru':1,'mail.ru':1,
+    'tutanota.com':1,'hey.com':1,'fastmail.com':1,'hushmail.com':1,'qq.com':1,
+    '163.com':1,'126.com':1,'sina.com':1,'naver.com':1,'rediffmail.com':1,
+    'comcast.net':1,'verizon.net':1,'att.net':1,'sbcglobal.net':1,'cox.net':1,
+    'bellsouth.net':1,'btinternet.com':1,'orange.fr':1,'free.fr':1,'web.de':1,
+    't-online.de':1,'libero.it':1,
+    // disposable / throwaway
+    'mailinator.com':1,'guerrillamail.com':1,'10minutemail.com':1,'trashmail.com':1,
+    'temp-mail.org':1,'yopmail.com':1,'getnada.com':1,'throwawaymail.com':1,
+    'sharklasers.com':1,'dispostable.com':1
+  };
+
+  // Disposable / throwaway email domains come from the optional
+  // disposable-domains.js file (window.IDPDisposableEmailDomains), loaded before
+  // this script. Absent → only the built-in free-provider list above applies.
+  // Built into a Set once, on first use (load-order independent).
+  var _disposableSet = null;
+  function getDisposableDomains() {
+    if (_disposableSet) return _disposableSet;
+    var data = window.IDPDisposableEmailDomains;
+    if (data instanceof Set) _disposableSet = data;
+    else if (typeof data === 'string') _disposableSet = new Set(data.split(' ').filter(Boolean));
+    else if (Array.isArray(data)) _disposableSet = new Set(data);
+    else return new Set(); // not loaded yet — return empty without caching, retry next call
+    return _disposableSet;
+  }
+
+  function emailDomain(s) {
+    var v = String(s).trim().toLowerCase();
+    var at = v.lastIndexOf('@');
+    return at === -1 ? '' : v.slice(at + 1);
+  }
+
+  function isBusinessEmail(s) {
+    if (CFG.allowFreeEmail) return true;
+    var domain = emailDomain(s);
+    if (!domain) return false;
+    if (FREE_EMAIL_DOMAINS[domain]) return false;
+    if (getDisposableDomains().has(domain)) return false;
+    if (CFG.extraFreeEmailDomains && CFG.extraFreeEmailDomains.indexOf(domain) !== -1) return false;
+    return true;
+  }
+
   function nowIso() { return new Date().toISOString(); }
 
   function safeStorageGet(key) {
@@ -183,50 +240,70 @@
   // All selectors are prefixed with `idp-chatbot-` to avoid colliding with
   // Webflow site styles. The CSS is scoped via the prefix; we don't touch any
   // global element selectors.
+  // Theme is driven by CSS custom properties on .idp-chatbot-root. Defaults match
+  // datasafeguard.us (dark navy + periwinkle accent). Override any token via
+  // IDPrivacyChatbotConfig.theme — see applyTheme().
   var STYLE = ''
     + '.idp-chatbot-root,.idp-chatbot-root *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}'
-    + '.idp-chatbot-root{position:fixed;right:20px;bottom:20px;z-index:2147483000;color:#1A77FE;}'
-    + '.idp-chatbot-bubble{width:60px;height:60px;border-radius:50%;background:#1A77FE;color:#fff;border:none;cursor:pointer;box-shadow:0 8px 24px rgba(11,31,58,.25);display:flex;align-items:center;justify-content:center;transition:transform .15s ease, box-shadow .15s ease;}'
-    + '.idp-chatbot-bubble:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(11,31,58,.3);}'
-    + '.idp-chatbot-bubble:focus-visible{outline:3px solid #2563eb;outline-offset:3px;}'
+    + '.idp-chatbot-root{--idp-accent:#6fa8ff;--idp-accent-hover:#5b97f5;--idp-on-accent:#060b1a;--idp-bg:#060b1a;--idp-surface:#0e1424;--idp-surface-2:#151d31;--idp-text:#f0f2f8;--idp-muted:#7b83a0;--idp-border:#1e2740;position:fixed;right:20px;bottom:20px;z-index:2147483000;color:var(--idp-text);}'
+    + '.idp-chatbot-bubble{width:60px;height:60px;border-radius:50%;background:var(--idp-accent);color:var(--idp-on-accent);border:none;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;transition:transform .15s ease, box-shadow .15s ease;}'
+    + '.idp-chatbot-bubble:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,.55);}'
+    + '.idp-chatbot-bubble:focus-visible{outline:3px solid var(--idp-accent);outline-offset:3px;}'
     + '.idp-chatbot-bubble svg{width:28px;height:28px;}'
-    + '.idp-chatbot-panel{position:absolute;right:0;bottom:76px;width:380px;max-width:calc(100vw - 32px);height:600px;max-height:calc(100vh - 100px);background:#fff;border-radius:14px;box-shadow:0 20px 50px rgba(11,31,58,.25);display:flex;flex-direction:column;overflow:hidden;opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;transition:opacity .18s ease, transform .18s ease;}'
+    + '.idp-chatbot-panel{position:absolute;right:0;bottom:76px;width:380px;max-width:calc(100vw - 32px);height:600px;max-height:calc(100vh - 100px);background:var(--idp-surface);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.55);display:flex;flex-direction:column;overflow:hidden;opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;transition:opacity .18s ease, transform .18s ease;border:1px solid var(--idp-border);}'
     + '.idp-chatbot-root.idp-chatbot-open .idp-chatbot-panel{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;}'
-    + '.idp-chatbot-header{background:#1A77FE;color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px;}'
+    + '.idp-chatbot-header{background:var(--idp-surface);color:var(--idp-text);padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--idp-border);}'
     + '.idp-chatbot-header-text{flex:1;min-width:0;}'
     + '.idp-chatbot-title{font-size:15px;font-weight:600;line-height:1.2;}'
-    + '.idp-chatbot-subtitle{font-size:12px;opacity:.8;line-height:1.3;margin-top:2px;}'
-    + '.idp-chatbot-icon-btn{background:transparent;border:0;color:#fff;cursor:pointer;width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;}'
-    + '.idp-chatbot-icon-btn:hover{background:rgba(255,255,255,.12);}'
-    + '.idp-chatbot-icon-btn:focus-visible{outline:2px solid #fff;outline-offset:1px;}'
+    + '.idp-chatbot-subtitle{font-size:12px;color:var(--idp-muted);line-height:1.3;margin-top:2px;}'
+    + '.idp-chatbot-icon-btn{background:transparent;border:0;color:var(--idp-text);cursor:pointer;width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;}'
+    + '.idp-chatbot-icon-btn:hover{background:rgba(255,255,255,.1);}'
+    + '.idp-chatbot-icon-btn:focus-visible{outline:2px solid var(--idp-accent);outline-offset:1px;}'
     + '.idp-chatbot-icon-btn svg{width:18px;height:18px;}'
-    + '.idp-chatbot-notice{background:#eff6ff;color:#1e3a8a;font-size:12px;padding:8px 12px;border-bottom:1px solid #dbeafe;}'
-    + '.idp-chatbot-messages{flex:1;overflow-y:auto;padding:14px 12px;background:#f5f7fb;display:flex;flex-direction:column;gap:8px;}'
+    + '.idp-chatbot-notice{background:rgba(111,168,255,.08);color:var(--idp-muted);font-size:12px;padding:8px 12px;border-bottom:1px solid var(--idp-border);}'
+    + '.idp-chatbot-messages{flex:1;overflow-y:auto;padding:14px 12px;background:var(--idp-bg);display:flex;flex-direction:column;gap:8px;}'
     + '.idp-chatbot-msg{max-width:85%;padding:10px 12px;border-radius:12px;font-size:14px;line-height:1.4;word-wrap:break-word;white-space:pre-wrap;}'
-    + '.idp-chatbot-msg-bot{background:#fff;color:#1A77FE;border:1px solid #e5e7eb;border-top-left-radius:4px;align-self:flex-start;}'
-    + '.idp-chatbot-msg-user{background:#2563eb;color:#fff;border-top-right-radius:4px;align-self:flex-end;}'
-    + '.idp-chatbot-msg-system{background:#fef3c7;color:#78350f;border:1px solid #fde68a;font-size:13px;align-self:stretch;max-width:100%;text-align:center;}'
-    + '.idp-chatbot-typing{display:inline-flex;gap:3px;padding:10px 12px;background:#fff;border:1px solid #e5e7eb;border-radius:12px;border-top-left-radius:4px;align-self:flex-start;}'
-    + '.idp-chatbot-typing span{width:6px;height:6px;border-radius:50%;background:#94a3b8;animation:idp-chatbot-blink 1.2s infinite ease-in-out;}'
+    + '.idp-chatbot-msg-bot{background:var(--idp-surface);color:var(--idp-text);border:1px solid var(--idp-border);border-top-left-radius:4px;align-self:flex-start;}'
+    + '.idp-chatbot-msg-user{background:var(--idp-accent);color:var(--idp-on-accent);border-top-right-radius:4px;align-self:flex-end;}'
+    + '.idp-chatbot-msg-system{background:rgba(111,168,255,.12);color:var(--idp-text);border:1px solid var(--idp-border);font-size:13px;align-self:stretch;max-width:100%;text-align:center;}'
+    + '.idp-chatbot-typing{display:inline-flex;gap:3px;padding:10px 12px;background:var(--idp-surface);border:1px solid var(--idp-border);border-radius:12px;border-top-left-radius:4px;align-self:flex-start;}'
+    + '.idp-chatbot-typing span{width:6px;height:6px;border-radius:50%;background:var(--idp-muted);animation:idp-chatbot-blink 1.2s infinite ease-in-out;}'
     + '.idp-chatbot-typing span:nth-child(2){animation-delay:.15s;}'
     + '.idp-chatbot-typing span:nth-child(3){animation-delay:.3s;}'
     + '@keyframes idp-chatbot-blink{0%,80%,100%{opacity:.25;transform:translateY(0);}40%{opacity:1;transform:translateY(-2px);}}'
     + '.idp-chatbot-quickreplies{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px 0;}'
-    + '.idp-chatbot-qr{background:#fff;border:1px solid #cbd5e1;color:#1A77FE;border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;transition:background .12s ease, border-color .12s ease;}'
-    + '.idp-chatbot-qr:hover{background:#eff6ff;border-color:#2563eb;}'
-    + '.idp-chatbot-qr:focus-visible{outline:2px solid #2563eb;outline-offset:1px;}'
-    + '.idp-chatbot-input-area{border-top:1px solid #e5e7eb;background:#fff;padding:8px;display:flex;gap:6px;align-items:flex-end;}'
-    + '.idp-chatbot-input{flex:1;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;font-size:14px;resize:none;max-height:96px;font-family:inherit;color:#1A77FE;background:#fff;}'
-    + '.idp-chatbot-input:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15);}'
-    + '.idp-chatbot-send{background:#2563eb;color:#fff;border:0;border-radius:10px;padding:0 14px;height:38px;font-size:14px;font-weight:600;cursor:pointer;}'
-    + '.idp-chatbot-send:hover{background:#1d4ed8;}'
-    + '.idp-chatbot-send:disabled{background:#94a3b8;cursor:not-allowed;}'
-    + '.idp-chatbot-send:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px;}'
-    + '.idp-chatbot-footer-actions{display:flex;justify-content:space-between;font-size:12px;padding:6px 12px;color:#64748b;background:#fff;border-top:1px solid #f1f5f9;}'
-    + '.idp-chatbot-footer-actions button{background:transparent;border:0;color:#2563eb;cursor:pointer;font-size:12px;padding:2px 4px;}'
+    + '.idp-chatbot-qr{background:var(--idp-surface);border:1px solid var(--idp-border);color:var(--idp-text);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;transition:background .12s ease, border-color .12s ease, color .12s ease;}'
+    + '.idp-chatbot-qr:hover{background:var(--idp-surface-2);border-color:var(--idp-accent);color:var(--idp-accent);}'
+    + '.idp-chatbot-qr:focus-visible{outline:2px solid var(--idp-accent);outline-offset:1px;}'
+    + '.idp-chatbot-input-area{border-top:1px solid var(--idp-border);background:var(--idp-surface);padding:8px;display:flex;gap:6px;align-items:flex-end;}'
+    + '.idp-chatbot-input{flex:1;border:1px solid var(--idp-border);border-radius:10px;padding:8px 10px;font-size:14px;resize:none;max-height:96px;font-family:inherit;color:var(--idp-text);background:var(--idp-surface-2);}'
+    + '.idp-chatbot-input::placeholder{color:var(--idp-muted);}'
+    + '.idp-chatbot-input:focus{outline:none;border-color:var(--idp-accent);box-shadow:0 0 0 3px rgba(111,168,255,.2);}'
+    + '.idp-chatbot-send{background:var(--idp-accent);color:var(--idp-on-accent);border:0;border-radius:10px;padding:0 14px;height:38px;font-size:14px;font-weight:600;cursor:pointer;}'
+    + '.idp-chatbot-send:hover{background:var(--idp-accent-hover);}'
+    + '.idp-chatbot-send:disabled{background:var(--idp-muted);cursor:not-allowed;}'
+    + '.idp-chatbot-send:focus-visible{outline:2px solid var(--idp-accent);outline-offset:2px;}'
+    + '.idp-chatbot-footer-actions{display:flex;justify-content:space-between;font-size:12px;padding:6px 12px;color:var(--idp-muted);background:var(--idp-surface);border-top:1px solid var(--idp-border);}'
+    + '.idp-chatbot-footer-actions button{background:transparent;border:0;color:var(--idp-accent);cursor:pointer;font-size:12px;padding:2px 4px;}'
     + '.idp-chatbot-footer-actions button:hover{text-decoration:underline;}'
     + '@media (max-width:480px){.idp-chatbot-panel{right:-8px;bottom:72px;width:calc(100vw - 16px);height:calc(100vh - 100px);max-height:none;border-radius:14px;}.idp-chatbot-root{right:12px;bottom:12px;}}'
     + '@media (prefers-reduced-motion: reduce){.idp-chatbot-panel,.idp-chatbot-bubble{transition:none;}.idp-chatbot-typing span{animation:none;}}';
+
+  // Map config.theme keys → CSS custom properties. Any subset can be supplied.
+  var THEME_VARS = {
+    accent: '--idp-accent', accentHover: '--idp-accent-hover', onAccent: '--idp-on-accent',
+    bg: '--idp-bg', surface: '--idp-surface', surface2: '--idp-surface-2',
+    text: '--idp-text', muted: '--idp-muted', border: '--idp-border'
+  };
+  function applyTheme(rootEl) {
+    var t = CFG.theme;
+    if (!t || typeof t !== 'object') return;
+    for (var key in THEME_VARS) {
+      if (Object.prototype.hasOwnProperty.call(t, key) && t[key]) {
+        rootEl.style.setProperty(THEME_VARS[key], String(t[key]));
+      }
+    }
+  }
 
   function injectStyle() {
     if (document.getElementById('idp-chatbot-style')) return;
@@ -275,6 +352,7 @@
     var root = document.createElement('div');
     root.className = 'idp-chatbot-root';
     root.setAttribute('data-idp-chatbot', '');
+    applyTheme(root); // config.theme overrides the default CSS variables
 
     root.innerHTML =
       '<button type="button" class="idp-chatbot-bubble" aria-label="Open chat" aria-expanded="false">'
@@ -664,9 +742,15 @@
         this.botSay("That field is required. " + field.prompt);
         return;
       }
-      if (field.validate === 'email' && !isValidEmail(trimmed)) {
-        this.botSay("That email doesn't look right — please enter a valid business email.");
-        return;
+      if (field.validate === 'email') {
+        if (!isValidEmail(trimmed)) {
+          this.botSay("That email doesn't look right — please enter a valid business email.");
+          return;
+        }
+        if (!isBusinessEmail(trimmed)) {
+          this.botSay("Please use your work email — personal and temporary email addresses (Gmail, Yahoo, Outlook, Mailinator, etc.) aren't accepted. Enter your company email address.");
+          return;
+        }
       }
       this.state.lead[field.key] = trimmed;
     }
