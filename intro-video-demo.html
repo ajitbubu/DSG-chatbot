@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chat with Intro Video</title>
+<style>
+  :root { --intro-video-width: 180px; --intro-video-height: 250px; } /* video card size */
+
+  #chat-launcher {
+    position: fixed; bottom: 20px; right: 20px;
+    width: 60px; height: 60px; border-radius: 50%;
+    background: #2563eb; color: #fff; border: none;
+    font-size: 26px; cursor: pointer; z-index: 9999;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  }
+
+  #chat-window {
+    position: fixed; bottom: 90px; right: 20px;
+    width: 360px; max-width: calc(100vw - 40px);
+    height: 520px; max-height: calc(100vh - 120px);
+    background: #fff; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,.3);
+    display: none; flex-direction: column; z-index: 9999;
+  }
+  #chat-window.open { display: flex; }
+
+  /* Video area — a centered card. The video FILLS the card (cover); object-position
+     keeps the face in frame when the card ratio differs from the source. */
+  #chat-intro-video {
+    width: 100%; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    padding: 10px 12px; background: #fff;
+  }
+  #chat-intro-video .video-card {
+    position: relative; flex: 0 0 auto;
+    width: var(--intro-video-width); height: var(--intro-video-height);
+    border-radius: 12px; overflow: hidden; background: #000;
+    box-shadow: 0 4px 14px rgba(0,0,0,.3);
+  }
+  #chat-intro-video video {
+    width: 100%; height: 100%; object-fit: cover; object-position: center 50%;
+    background: #000; display: block;
+  }
+  #unmute-btn {
+    position: absolute; right: 8px; bottom: 8px;
+    background: rgba(0,0,0,.72); color: #fff; border: none;
+    padding: 5px 10px; border-radius: 999px; font-size: 11px;
+    cursor: pointer;
+  }
+
+  /* Chat body */
+  #chat-messages { flex: 1 1 auto; overflow-y: auto; padding: 12px; }
+  #chat-input-row { display: flex; border-top: 1px solid #eee; }
+  #chat-input { flex: 1; border: none; padding: 12px; font-size: 14px; outline: none; }
+  #chat-send { border: none; background: #2563eb; color: #fff; padding: 0 16px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+  <!-- Floating launcher -->
+  <button id="chat-launcher" aria-label="Open chat" onclick="toggleChat()">💬</button>
+
+  <!-- Chat window -->
+  <div id="chat-window" role="dialog" aria-label="Chat window">
+    <!-- Intro video is injected here when chat opens -->
+    <div id="chat-intro-video"></div>
+
+    <div id="chat-messages">
+      <p>Hi! How can we help you today?</p>
+    </div>
+
+    <div id="chat-input-row">
+      <input id="chat-input" type="text" placeholder="Type a message..." aria-label="Message" />
+      <button id="chat-send">Send</button>
+    </div>
+  </div>
+
+  <script>
+    // ====== 1) Your self-hosted intro video (MP4) ======
+    // Point this at your MP4. In production, host it on your CDN and use that URL.
+    const INTRO_VIDEO_URL = "DataSafeguard-webflow_540.mp4";
+    // ===================================================
+
+    // Inject a fresh <video> so it restarts from the beginning every time the chat
+    // opens. autoplay + playsinline lets it autoplay INLINE (no fullscreen takeover,
+    // no fullscreen button). CSS sizes it to fit the area (whole frame, no crop).
+    function loadIntroVideo() {
+      const container = document.getElementById("chat-intro-video");
+      container.innerHTML =
+        '<div class="video-card">' +
+          '<video id="intro-video-el" src="' + INTRO_VIDEO_URL + '" ' +
+            'autoplay playsinline preload="auto" ' +
+            'title="Welcome video" aria-label="Welcome intro video"></video>' +
+          '<button id="unmute-btn" onclick="toggleMute()">🔇 Mute</button>' +
+        '</div>';
+
+      const v = document.getElementById("intro-video-el");
+      // Default: sound ON. Browsers allow unmuted autoplay only with user activation
+      // (opening the chat is a click, so it usually works). If blocked, fall back to
+      // muted so the video still plays, and show the Unmute button.
+      v.muted = false;
+      const p = v.play();
+      if (p && p.then) {
+        p.then(syncMuteBtn).catch(() => {
+          v.muted = true;
+          const retry = v.play();
+          if (retry && retry.catch) retry.catch(() => {});
+          syncMuteBtn();
+        });
+      } else {
+        syncMuteBtn();
+      }
+    }
+
+    // Reflect the current mute state on the button.
+    function syncMuteBtn() {
+      const v = document.getElementById("intro-video-el");
+      const btn = document.getElementById("unmute-btn");
+      if (!v || !btn) return;
+      btn.textContent = v.muted ? "🔊 Unmute" : "🔇 Mute";
+      btn.setAttribute("aria-label", v.muted ? "Unmute video" : "Mute video");
+      btn.setAttribute("title", v.muted ? "Unmute" : "Mute");
+    }
+
+    // Self-hosted MP4 is same-document, so sound toggles INSTANTLY — no reload,
+    // no restart (the advantage over a cross-origin iframe).
+    function toggleMute() {
+      const v = document.getElementById("intro-video-el");
+      if (!v) return;
+      v.muted = !v.muted;
+      syncMuteBtn();
+    }
+
+    function openChat() {
+      document.getElementById("chat-window").classList.add("open");
+      // Inject video AFTER the panel is visible so autoplay isn't blocked.
+      loadIntroVideo();
+    }
+
+    function closeChat() {
+      document.getElementById("chat-window").classList.remove("open");
+      // Stop + clear the video so it restarts fresh next open.
+      const v = document.getElementById("intro-video-el");
+      if (v) v.pause();
+      document.getElementById("chat-intro-video").innerHTML = "";
+    }
+
+    function toggleChat() {
+      const open = document.getElementById("chat-window").classList.contains("open");
+      open ? closeChat() : openChat();
+    }
+  </script>
+</body>
+</html>

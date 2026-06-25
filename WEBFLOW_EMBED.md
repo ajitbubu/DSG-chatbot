@@ -24,9 +24,7 @@ Two ways to install. Pick **one**.
        people: [
          "Sales / Product Specialist",
          "Privacy Consultant",
-         "Technical Architect",
-         "Ajit Sahu",
-         "Sudhir Sahu"
+         "Technical Architect"
        ]
      };
    </script>

@@ -13,7 +13,7 @@
  *       productName: "ID-PRIVACY®",
  *       defaultAssignee: "Privacy Automation Team",
  *       people: ["Sales / Product Specialist", "Privacy Consultant",
- *                "Technical Architect", "Ajit Sahu", "Sudhir Sahu"],
+ *                "Technical Architect"],
  *       // Optional future-calendar placeholders:
  *       // calendly: { url: "https://calendly.com/your-team/intro" },
  *       // googleCalendar: { enabled: false },
@@ -56,6 +56,26 @@
     //   theme: { accent: '#16a34a', bg: '#0b1f14', surface: '#10271b' }
     // Keys: accent, accentHover, onAccent, bg, surface, surface2, text, muted, border
     theme: null,
+    // ----- Intro video (self-hosted MP4, shown at the very top of the chat panel) -----
+    // introVideoUrl points at your MP4 — host it on your CDN in production. Set
+    // introVideo:false to hide the video. introVideoPoster (optional) is an image
+    // shown before the first frame paints.
+    introVideo: true,
+    introVideoUrl: 'DataSafeguard-webflow_540.mp4',
+    introVideoPoster: '',
+    // The video shows as a centered card (introVideoWidth × introVideoHeight, px) at
+    // the top of the panel, filled via object-fit:cover. If the card ratio differs
+    // from the source's 9:16, the video is cropped to fill; introVideoPosition frames
+    // which part stays visible ('center 50%' = centered face). All overridable via
+    // the matching --idp-video-* CSS variables.
+    introVideoWidth: 180,
+    introVideoHeight: 250,
+    introVideoPosition: 'center 50%',
+    // Start with sound ON by default. Browsers only allow unmuted autoplay when
+    // there's user activation (opening the chat is a click, so it normally works);
+    // if the browser blocks it, the widget falls back to muted automatically.
+    // Set introVideoMuted:true to always start muted.
+    introVideoMuted: false,
     // Calendar integration placeholders — wired up here so future work
     // only needs to flip a flag / supply a URL.
     calendly: null,        // { url: "https://calendly.com/..." }
@@ -245,13 +265,24 @@
   // IDPrivacyChatbotConfig.theme — see applyTheme().
   var STYLE = ''
     + '.idp-chatbot-root,.idp-chatbot-root *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}'
-    + '.idp-chatbot-root{--idp-accent:#6fa8ff;--idp-accent-hover:#5b97f5;--idp-on-accent:#060b1a;--idp-bg:#060b1a;--idp-surface:#0e1424;--idp-surface-2:#151d31;--idp-text:#f0f2f8;--idp-muted:#7b83a0;--idp-border:#1e2740;position:fixed;right:20px;bottom:20px;z-index:2147483000;color:var(--idp-text);}'
+    + '.idp-chatbot-root{--idp-accent:#6fa8ff;--idp-accent-hover:#5b97f5;--idp-on-accent:#060b1a;--idp-bg:#060b1a;--idp-surface:#0e1424;--idp-surface-2:#151d31;--idp-text:#f0f2f8;--idp-muted:#7b83a0;--idp-border:#1e2740;--idp-video-width:180px;--idp-video-height:250px;position:fixed;right:20px;bottom:20px;z-index:2147483000;color:var(--idp-text);}'
     + '.idp-chatbot-bubble{width:60px;height:60px;border-radius:50%;background:var(--idp-accent);color:var(--idp-on-accent);border:none;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;transition:transform .15s ease, box-shadow .15s ease;}'
     + '.idp-chatbot-bubble:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(0,0,0,.55);}'
     + '.idp-chatbot-bubble:focus-visible{outline:3px solid var(--idp-accent);outline-offset:3px;}'
     + '.idp-chatbot-bubble svg{width:28px;height:28px;}'
-    + '.idp-chatbot-panel{position:absolute;right:0;bottom:76px;width:380px;max-width:calc(100vw - 32px);height:600px;max-height:calc(100vh - 100px);background:var(--idp-surface);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.55);display:flex;flex-direction:column;overflow:hidden;opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;transition:opacity .18s ease, transform .18s ease;border:1px solid var(--idp-border);}'
+    + '.idp-chatbot-panel{position:absolute;right:0;bottom:76px;width:380px;max-width:calc(100vw - 32px);height:620px;max-height:calc(100vh - 100px);background:var(--idp-surface);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.55);display:flex;flex-direction:column;overflow:hidden;opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;transition:opacity .18s ease, transform .18s ease;border:1px solid var(--idp-border);}'
     + '.idp-chatbot-root.idp-chatbot-open .idp-chatbot-panel{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;}'
+    // Intro video shown as a centered card (width x height) below the header. The
+    // video FILLS the card (object-fit:cover); object-position keeps the face in
+    // frame when the ratio differs. Surface band matches the header.
+    // flex:0 0 auto keeps it above the (independently scrolling) messages.
+    + '.idp-chatbot-video{position:relative;flex:0 0 auto;width:100%;display:flex;align-items:center;justify-content:center;padding:10px 12px;background:var(--idp-surface);}'
+    + '.idp-chatbot-video-card{position:relative;flex:0 0 auto;width:var(--idp-video-width,180px);height:var(--idp-video-height,250px);border-radius:12px;overflow:hidden;background:#000;box-shadow:0 4px 14px rgba(0,0,0,.4);}'
+    + '.idp-chatbot-video-card video{display:block;width:100%;height:100%;object-fit:cover;object-position:var(--idp-video-position,center 50%);background:#000;}'
+    + '.idp-chatbot-unmute{position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:5px;background:rgba(6,11,26,.72);color:#fff;border:1px solid var(--idp-border);border-radius:999px;padding:5px 9px;font-size:11px;font-weight:600;line-height:1;cursor:pointer;}'
+    + '.idp-chatbot-unmute:hover{background:rgba(6,11,26,.92);}'
+    + '.idp-chatbot-unmute:focus-visible{outline:2px solid var(--idp-accent);outline-offset:2px;}'
+    + '.idp-chatbot-unmute svg{width:14px;height:14px;display:block;}'
     + '.idp-chatbot-header{background:var(--idp-surface);color:var(--idp-text);padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--idp-border);}'
     + '.idp-chatbot-header-text{flex:1;min-width:0;}'
     + '.idp-chatbot-title{font-size:15px;font-weight:600;line-height:1.2;}'
@@ -261,7 +292,7 @@
     + '.idp-chatbot-icon-btn:focus-visible{outline:2px solid var(--idp-accent);outline-offset:1px;}'
     + '.idp-chatbot-icon-btn svg{width:18px;height:18px;}'
     + '.idp-chatbot-notice{background:rgba(111,168,255,.08);color:var(--idp-muted);font-size:12px;padding:8px 12px;border-bottom:1px solid var(--idp-border);}'
-    + '.idp-chatbot-messages{flex:1;overflow-y:auto;padding:14px 12px;background:var(--idp-bg);display:flex;flex-direction:column;gap:8px;}'
+    + '.idp-chatbot-messages{flex:1 1 0;min-height:0;overflow-y:auto;padding:14px 12px;background:var(--idp-bg);display:flex;flex-direction:column;gap:8px;}'
     + '.idp-chatbot-msg{max-width:85%;padding:10px 12px;border-radius:12px;font-size:14px;line-height:1.4;word-wrap:break-word;white-space:pre-wrap;}'
     + '.idp-chatbot-msg-bot{background:var(--idp-surface);color:var(--idp-text);border:1px solid var(--idp-border);border-top-left-radius:4px;align-self:flex-start;}'
     + '.idp-chatbot-msg-user{background:var(--idp-accent);color:var(--idp-on-accent);border-top-right-radius:4px;align-self:flex-end;}'
@@ -271,7 +302,7 @@
     + '.idp-chatbot-typing span:nth-child(2){animation-delay:.15s;}'
     + '.idp-chatbot-typing span:nth-child(3){animation-delay:.3s;}'
     + '@keyframes idp-chatbot-blink{0%,80%,100%{opacity:.25;transform:translateY(0);}40%{opacity:1;transform:translateY(-2px);}}'
-    + '.idp-chatbot-quickreplies{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px 0;}'
+    + '.idp-chatbot-quickreplies{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px 0;flex:0 1 auto;max-height:118px;overflow-y:auto;}'
     + '.idp-chatbot-qr{background:var(--idp-surface);border:1px solid var(--idp-border);color:var(--idp-text);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;transition:background .12s ease, border-color .12s ease, color .12s ease;}'
     + '.idp-chatbot-qr:hover{background:var(--idp-surface-2);border-color:var(--idp-accent);color:var(--idp-accent);}'
     + '.idp-chatbot-qr:focus-visible{outline:2px solid var(--idp-accent);outline-offset:1px;}'
@@ -353,6 +384,12 @@
     root.className = 'idp-chatbot-root';
     root.setAttribute('data-idp-chatbot', '');
     applyTheme(root); // config.theme overrides the default CSS variables
+    // Size the intro-video area (px). Also settable via the --idp-video-height CSS var.
+    if (CFG.introVideo) {
+      root.style.setProperty('--idp-video-width', (parseInt(CFG.introVideoWidth, 10) || 180) + 'px');
+      root.style.setProperty('--idp-video-height', (parseInt(CFG.introVideoHeight, 10) || 250) + 'px');
+      root.style.setProperty('--idp-video-position', String(CFG.introVideoPosition || 'center 50%'));
+    }
 
     root.innerHTML =
       '<button type="button" class="idp-chatbot-bubble" aria-label="Open chat" aria-expanded="false">'
@@ -373,6 +410,11 @@
       +       '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
       +     '</button>'
       +   '</div>'
+      // Intro-video container under the header — always present so injecting the
+      // <video> on open() causes no layout shift. The <video> is injected in open().
+      +   (CFG.introVideo
+            ? '<div class="idp-chatbot-video" role="region" aria-label="' + escapeHtml(CFG.productName + ' video introduction') + '"></div>'
+            : '')
       +   '<div class="idp-chatbot-notice" role="note">Please do not enter sensitive personal data in this chat.</div>'
       +   '<div class="idp-chatbot-messages" aria-live="polite" aria-atomic="false"></div>'
       +   '<div class="idp-chatbot-quickreplies"></div>'
@@ -391,6 +433,7 @@
     this.els.root         = root;
     this.els.bubble       = root.querySelector('.idp-chatbot-bubble');
     this.els.panel        = root.querySelector('.idp-chatbot-panel');
+    this.els.video        = root.querySelector('.idp-chatbot-video');
     this.els.closeBtn     = root.querySelector('.idp-chatbot-close-btn');
     this.els.scheduleBtn  = root.querySelector('.idp-chatbot-schedule');
     this.els.messages     = root.querySelector('.idp-chatbot-messages');
@@ -918,15 +961,98 @@
     }
   };
 
+  // ----- Intro video (self-hosted MP4, top of the chat panel) -----
+
+  // Contents of the mute/unmute toggle button for a given muted state.
+  function unmuteButtonHtml(muted) {
+    var unmuteIcon = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z" fill="currentColor"/><path d="m17 9 4 6M21 9l-4 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    var muteIcon   = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z" fill="currentColor"/><path d="M16 9a4 4 0 0 1 0 6M18.5 7a7 7 0 0 1 0 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    return (muted ? unmuteIcon : muteIcon) + '<span>' + (muted ? 'Unmute' : 'Mute') + '</span>';
+  }
+
+  // Inject a fresh <video> on every open so it restarts from the beginning.
+  Chatbot.prototype.injectVideo = function () {
+    if (!CFG.introVideo || !this.els.video) return;
+    this.els.video.innerHTML =
+      '<div class="idp-chatbot-video-card">'
+      + '<video class="idp-chatbot-video-el"'
+      + ' src="' + escapeHtml(CFG.introVideoUrl) + '"'
+      + (CFG.introVideoPoster ? ' poster="' + escapeHtml(CFG.introVideoPoster) + '"' : '')
+      // autoplay + playsinline → plays INLINE (no fullscreen takeover). We try to
+      // start WITH sound below; CSS sizes the video to fill the card.
+      + ' autoplay playsinline preload="auto"'
+      + ' title="' + escapeHtml(CFG.productName + ' video introduction') + '"'
+      + ' aria-label="' + escapeHtml(CFG.productName + ' video introduction') + '"></video>'
+      + '<button type="button" class="idp-chatbot-unmute"'
+      +   ' aria-label="Mute introduction video" title="Mute">'
+      +   unmuteButtonHtml(false)
+      + '</button>'
+      + '</div>';
+
+    var videoEl = this.els.video.querySelector('.idp-chatbot-video-el');
+    var btn = this.els.video.querySelector('.idp-chatbot-unmute');
+    if (!videoEl) return;
+
+    function syncBtn() {
+      if (!btn) return;
+      var muted = videoEl.muted;
+      btn.innerHTML = unmuteButtonHtml(muted);
+      btn.setAttribute('aria-label', muted ? 'Unmute introduction video' : 'Mute introduction video');
+      btn.setAttribute('title', muted ? 'Unmute' : 'Mute');
+    }
+
+    // Default: sound ON (introVideoMuted=false). Browsers only allow unmuted autoplay
+    // with user activation — opening the chat is a click, so this usually works. If
+    // it's blocked, fall back to muted so the video still plays.
+    videoEl.muted = !!CFG.introVideoMuted;
+    var pr = videoEl.play();
+    if (pr && pr.then) {
+      pr.then(syncBtn).catch(function () {
+        if (!videoEl.muted) {
+          videoEl.muted = true;            // unmuted autoplay blocked → mute & retry
+          var retry = videoEl.play();
+          if (retry && retry.catch) retry.catch(function () {});
+        }
+        syncBtn();
+      });
+    } else {
+      syncBtn();
+    }
+
+    if (btn) {
+      btn.addEventListener('click', function () {
+        // Self-hosted MP4 is same-document, so sound toggles INSTANTLY — no reload
+        // and no restart (the key advantage over a cross-origin iframe).
+        videoEl.muted = !videoEl.muted;
+        syncBtn();
+      });
+    }
+  };
+
+  // Pause + remove the video when the chat closes so it stops and reopens fresh.
+  // The empty container keeps its fixed height, so reopening causes no layout shift.
+  Chatbot.prototype.clearVideo = function () {
+    if (!this.els.video) return;
+    var videoEl = this.els.video.querySelector('.idp-chatbot-video-el');
+    if (videoEl && videoEl.pause) { try { videoEl.pause(); } catch (e) {} }
+    this.els.video.innerHTML = '';
+  };
+
   // ----- Public API -----
+  // open()/close() are the openChat()/closeChat() equivalents; video injection
+  // lives in open() so the intro plays on every open, not at page load.
   Chatbot.prototype.open = function () {
     this.els.root.classList.add('idp-chatbot-open');
     this.els.bubble.setAttribute('aria-expanded', 'true');
+    // Inject the intro video on every open so it autoplays (muted) and restarts
+    // from the beginning.
+    this.injectVideo();
     this.els.input.focus();
   };
   Chatbot.prototype.close = function () {
     this.els.root.classList.remove('idp-chatbot-open');
     this.els.bubble.setAttribute('aria-expanded', 'false');
+    this.clearVideo(); // stop playback when the chat closes
   };
   Chatbot.prototype.toggle = function () {
     if (this.els.root.classList.contains('idp-chatbot-open')) this.close();

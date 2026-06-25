@@ -12,3 +12,7 @@ node_modules/
 
 # Tooling
 .gstack/
+
+# Large uncompressed source video — commit the compressed
+# DataSafeguard-webflow_540.mp4 (~1.7MB) instead, which is what the widget loads.
+DataSafeguard-webflow_1080p.mp4
