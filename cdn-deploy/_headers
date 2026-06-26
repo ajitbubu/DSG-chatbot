@@ -1,0 +1,14 @@
+# Netlify custom headers for the ID-PRIVACY chatbot CDN assets.
+# Place this file at the site root (it already is, inside cdn-deploy/).
+
+# Video rarely changes → cache hard. If you ever swap the clip, change the
+# filename (e.g. _540.v2.mp4) so browsers fetch the new one.
+/DataSafeguard-webflow_540.mp4
+  Cache-Control: public, max-age=31536000, immutable
+  Access-Control-Allow-Origin: *
+
+# Widget JS may change → cache 1 hour. To push an urgent update sooner, bump a
+# query string in the Webflow <script src>, e.g. .../idprivacy-chatbot.js?v=2
+/idprivacy-chatbot.js
+  Cache-Control: public, max-age=3600
+  Access-Control-Allow-Origin: *

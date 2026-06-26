@@ -13,6 +13,9 @@ node_modules/
 # Tooling
 .gstack/
 
-# Large uncompressed source video — commit the compressed
-# DataSafeguard-webflow_540.mp4 (~1.7MB) instead, which is what the widget loads.
+# Videos: the uncompressed master, and any root-level copy of the 540p, stay out
+# of git. The ONLY tracked video is cdn-deploy/DataSafeguard-webflow_540.mp4.
 DataSafeguard-webflow_1080p.mp4
+/DataSafeguard-webflow_540.mp4
+
+# NOTE: cdn-deploy/ is the tracked build output (run ./build.sh to refresh it).

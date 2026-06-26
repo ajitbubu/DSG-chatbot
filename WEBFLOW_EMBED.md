@@ -6,8 +6,10 @@ Two ways to install. Pick **one**.
 
 ## Option A — Hosted script (recommended for production)
 
-1. Upload `idprivacy-chatbot.js` to your CDN, S3 bucket, or hosting of choice.
-   Note the public URL, e.g. `https://cdn.your-domain.com/idprivacy-chatbot.js`.
+1. Stage the deployable files with `./build.sh` (populates `cdn-deploy/`), then
+   publish that folder to a static host. Currently hosted on **Netlify**
+   (`https://dsg-chatbot.netlify.app`), which serves both the widget JS and the
+   intro video. See [README.md](README.md) for the build/deploy flow.
 
 2. In Webflow, open **Pages → Contact Us → Settings (cog icon) → Custom code**
    and scroll to **"Before `</body>` tag"**.
@@ -17,18 +19,20 @@ Two ways to install. Pick **one**.
    ```html
    <script>
      window.IDPrivacyChatbotConfig = {
-       webhookUrl: "https://your-api.example.com/api/contact-lead",
+       webhookUrl: "https://dsg-chatbot-af7b5-default-rtdb.firebaseio.com/leads.json",
        companyName: "Data Safeguard",
        productName: "ID-PRIVACY®",
        defaultAssignee: "Privacy Automation Team",
-       people: [
-         "Sales / Product Specialist",
-         "Privacy Consultant",
-         "Technical Architect"
-       ]
+       people: ["Sales / Product Specialist", "Privacy Consultant", "Technical Architect"],
+       // Intro video (absolute URL required — the JS default is relative):
+       introVideoUrl: "https://dsg-chatbot.netlify.app/DataSafeguard-webflow_540.mp4",
+       introVideoWidth: 180,
+       introVideoHeight: 250,
+       introVideoPosition: "center 50%",
+       introVideoMuted: false
      };
    </script>
-   <script src="https://cdn.your-domain.com/idprivacy-chatbot.js" defer></script>
+   <script src="https://dsg-chatbot.netlify.app/idprivacy-chatbot.js" defer></script>
    ```
 
 To enable the bot **site-wide** instead of just on Contact Us, paste the same
