@@ -84,11 +84,15 @@
   -->
   <script src="./config.local.js"></script>
 
-  <!-- 2) Optional: disposable email-domain blocklist. Loads before the widget;
-       if omitted, the widget still blocks common free providers. -->
-  <script src="./disposable-domains.js" defer></script>
+  <!-- Local demo only: the compressed video lives in cdn-deploy/ (the deploy
+       bundle). In production the Webflow embed sets an absolute CDN URL instead. -->
+  <script>
+    if (window.IDPrivacyChatbotConfig) {
+      window.IDPrivacyChatbotConfig.introVideoUrl = "./cdn-deploy/DataSafeguard-webflow_540.mp4";
+    }
+  </script>
 
-  <!-- 3) Load the widget. In production, host this on your CDN. -->
+  <!-- 2) Load the widget. In production, host this on your CDN. -->
   <script src="./idprivacy-chatbot.js" defer></script>
 </body>
 </html>
