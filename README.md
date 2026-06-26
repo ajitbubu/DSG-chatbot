@@ -13,9 +13,7 @@ into Firebase and shows a short intro video at the top of the chat panel.
 | `DataSafeguard-webflow_1080p.mp4` | Uncompressed master (git-ignored; re-encode source → cdn-deploy/). |
 | `config.example.js` | Config template (safe to commit). |
 | `config.local.js` | Real local config incl. Firebase URL (git-ignored). |
-| `disposable-domains.js` | Optional extra disposable-email blocklist. |
 | `index.html` | Local demo that loads the widget like production. |
-| `intro-video-demo.html` | Standalone, single-file demo of the video panel. |
 | `build.sh` | Copies the production files into `cdn-deploy/`. |
 | **`cdn-deploy/`** | **Build output** that gets hosted (tracked in git). |
 | `*.md` | Embed guide, payload spec, production checklist. |
